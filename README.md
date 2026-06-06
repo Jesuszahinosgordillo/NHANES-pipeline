@@ -93,4 +93,4 @@ Los CSV de los cuatro módulos se tratan como entradas congeladas del proyecto. 
 
 ## Git
 
-El proyecto incluye historial local de Git y una acción de validación. Para la entrega al tutor, la forma más limpia es subir esta carpeta a un repositorio remoto y compartir la URL junto con el HTML renderizado.
+El proyecto incluye historial local de Git y una acción de validación.
