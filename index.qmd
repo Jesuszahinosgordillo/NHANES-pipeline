@@ -1,0 +1,304 @@
+---
+title: "Construcción reproducible de una tabla analítica NHANES 2013–2014"
+subtitle: "Integración por participante, mortalidad vinculada y diagnóstico inicial de datos faltantes"
+author: "Jesús Manuel Zahinos Gordillo"
+date: last-modified
+lang: es
+---
+
+```{r}
+#| label: setup
+#| include: false
+Sys.setlocale("LC_CTYPE", "C.UTF-8")
+options(encoding = "UTF-8")
+library(dplyr)
+library(readr)
+library(knitr)
+library(scales)
+
+analytic <- readRDS("data/processed/nhanes_2013_2014_analytic.rds")
+input_audit <- read_csv("outputs/tables/input_audit.csv", show_col_types = FALSE)
+join_audit <- read_csv("outputs/tables/join_audit.csv", show_col_types = FALSE)
+mortality_audit <- read_csv("outputs/tables/mortality_audit.csv", show_col_types = FALSE)
+followup_audit <- read_csv("outputs/tables/followup_audit.csv", show_col_types = FALSE)
+followup_summary <- read_csv("outputs/tables/followup_summary.csv", show_col_types = FALSE)
+missingness_all <- read_csv("outputs/tables/missingness_all_variables.csv", show_col_types = FALSE)
+missingness_module <- read_csv("outputs/tables/missingness_module_summary.csv", show_col_types = FALSE)
+missingness_core <- read_csv("outputs/tables/missingness_core_variables.csv", show_col_types = FALSE)
+missingness_screen <- read_csv("outputs/tables/missingness_mechanism_screen.csv", show_col_types = FALSE)
+survey_design <- read_csv("outputs/tables/survey_design_inventory.csv", show_col_types = FALSE)
+coverage <- read_csv("outputs/tables/module_coverage.csv", show_col_types = FALSE)
+cohort_profile <- read_csv("outputs/tables/cohort_profile.csv", show_col_types = FALSE)
+
+fmt_n <- function(x) format(x, big.mark = ".", decimal.mark = ",", scientific = FALSE)
+fmt_pct <- function(x, digits = 1) paste0(format(round(x, digits), decimal.mark = ",", nsmall = digits), "%")
+fmt_p <- function(x) {
+  ifelse(is.na(x), "—", ifelse(x < 0.001, "< 0,001", format(round(x, 3), decimal.mark = ",", nsmall = 3)))
+}
+```
+
+# Resumen de la entrega
+
+En esta primera fase he construido una tabla única a nivel de participante para el ciclo NHANES 2013–2014. El punto de partida es **Demographic** y, mediante `SEQN`, se incorporan **Examination**, **Labs**, **Questionnaire** y el archivo público de mortalidad vinculada. La tabla final contiene `r fmt_n(nrow(analytic))` participantes y `r fmt_n(ncol(analytic))` variables, con una sola fila por `SEQN`.
+
+El objetivo de esta entrega es dejar preparado el dato. No se han seleccionado predictores por su relación con la mortalidad, no se han imputado valores y no se ha ajustado ningún modelo. De esta forma, las decisiones de limpieza y construcción de la cohorte quedan separadas de la fase posterior de modelización.
+
+La ejecución completa se realiza desde la raíz del proyecto con:
+
+```bash
+Rscript scripts/bootstrap.R
+quarto render
+```
+
+El render vuelve a ejecutar el pipeline antes de generar el informe. La semilla fijada es `r yaml::read_yaml("config/sources.yml")$project$seed`. En esta fase casi todas las operaciones son deterministas, pero la semilla queda definida desde el inicio para que las fases posteriores utilicen el mismo criterio.
+
+# Fuentes y trazabilidad
+
+Los cuatro módulos de NHANES se conservan en `data/raw/nhanes/` como extractos congelados por módulo. El archivo de mortalidad se conserva en su formato público de ancho fijo. Durante cada ejecución se comprueban el número de filas, la unicidad de `SEQN` y la huella SHA-256 de cada entrada. Si cambia un archivo, aparece una clave duplicada o varía el número esperado de participantes, el proceso se detiene.
+
+```{r}
+#| label: tbl-input-audit
+#| tbl-cap: "Auditoría de las fuentes de entrada"
+input_audit |>
+  transmute(
+    Fuente = source,
+    Filas = rows,
+    `Variables tras resolver nombres repetidos` = columns_after_resolution,
+    `SEQN únicos` = distinct_seqn,
+    `SEQN duplicados` = duplicated_seqn,
+    `SEQN faltantes` = missing_seqn,
+    `SHA-256 verificado` = if_else(sha256_verified, "Sí", "No")
+  ) |>
+  kable(format.args = list(big.mark = ".", decimal.mark = ","))
+```
+
+Algunos extractos incorporaban variables repetidas con sufijos `.x` y `.y`, generados al agrupar componentes previos. Para evitar que esas duplicidades pasen inadvertidas, el pipeline consolida automáticamente las columnas equivalentes y se detiene si encuentra valores contradictorios entre columnas solapadas. En la tabla final no queda ninguna variable con sufijos `.x` o `.y`, de modo que el resultado es una matriz analítica limpia y con nombres únicos.
+
+# Perfil inicial de la cohorte
+
+Antes de cualquier modelización conviene dejar fijado el denominador real de trabajo. La tabla siguiente resume la cohorte construida y permite comprobar, de un vistazo, la cobertura de examen, laboratorio, cuestionario y mortalidad. Esta sección no se interpreta como búsqueda de resultados clínicos; solo documenta el dato disponible y sus restricciones de uso.
+
+```{r}
+#| label: tbl-cohort-profile
+#| tbl-cap: "Perfil mínimo de la tabla analítica integrada"
+cohort_profile |>
+  rename(Indicador = indicador, Valor = valor) |>
+  kable()
+```
+
+```{r}
+#| label: fig-age-eligibility
+#| echo: false
+#| fig-cap: "Distribución de edad según elegibilidad para el archivo público de mortalidad."
+knitr::include_graphics("outputs/figures/age_by_mortality_eligibility.png")
+```
+
+Esta figura explica por qué una parte relevante de las variables de mortalidad aparece ausente cuando se calcula el porcentaje sobre toda la cohorte. En los menores de 18 años, el archivo público no proporciona el seguimiento individual. Por tanto, esa ausencia no debe tratarse como no respuesta ni imputarse como si fuera un dato clínico perdido.
+
+# Integración por participante
+
+He utilizado Demographic como tabla maestra y he realizado uniones izquierdas uno a uno. Esta decisión conserva a los participantes que no acudieron al centro de examen móvil o que no disponen de una determinación de laboratorio. Una unión interna habría eliminado esos casos sin dejar constancia y habría condicionado la cohorte a la disponibilidad de información.
+
+```{r}
+#| label: tbl-join-audit
+#| tbl-cap: "Comprobaciones automáticas de las uniones"
+join_audit |>
+  mutate(Resultado = if_else(passed, "Superada", "Fallida")) |>
+  select(`Comprobación` = check, Valor = value, Esperado = expected, Resultado) |>
+  kable(format.args = list(big.mark = ".", decimal.mark = ","))
+```
+
+La figura siguiente muestra la cobertura de cada fuente. Examination y Labs no cubren a toda la cohorte porque dependen de la participación en el examen y de los procedimientos realizados. En cambio, Questionnaire y el archivo de mortalidad se vinculan por `SEQN` para todos los participantes, aunque el seguimiento público de mortalidad solo está disponible para quienes cumplen los criterios de elegibilidad.
+
+```{r}
+#| label: fig-module-coverage
+#| echo: false
+#| fig-cap: "Cobertura de los módulos incorporados y elegibilidad del archivo público de mortalidad."
+knitr::include_graphics("outputs/figures/module_coverage.png")
+```
+
+# Mortalidad y tiempo de seguimiento
+
+El archivo de mortalidad se lee como un fichero de ancho fijo y se une por `SEQN`. La variable `mort__event` conserva el estado vital publicado: `0` para participantes asumidos vivos y `1` para participantes asumidos fallecidos. Entre los `r fmt_n(mortality_audit$value[mortality_audit$metric == "Elegibles para seguimiento público"])` participantes elegibles se observan `r fmt_n(mortality_audit$value[mortality_audit$metric == "Fallecidos"])` fallecimientos y `r fmt_n(mortality_audit$value[mortality_audit$metric == "Asumidos vivos"])` participantes asumidos vivos.
+
+```{r}
+#| label: tbl-mortality-audit
+#| tbl-cap: "Auditoría de la vinculación con mortalidad"
+mortality_audit |>
+  rename(Indicador = metric, Valor = value) |>
+  kable(format.args = list(big.mark = ".", decimal.mark = ","))
+```
+
+## Dos orígenes temporales que no deben mezclarse
+
+El archivo proporciona dos medidas de seguimiento y las he mantenido separadas:
+
+- `mort__followup_months_interview`: meses transcurridos desde la entrevista. Está disponible para los `r fmt_n(sum(analytic$mort__ELIGSTAT == 1L, na.rm = TRUE))` participantes elegibles.
+- `mort__followup_months_exam`: meses transcurridos desde el examen MEC. Está disponible para los `r fmt_n(sum(analytic$mort__ELIGSTAT == 1L & !is.na(analytic$mort__followup_months_exam), na.rm = TRUE))` participantes elegibles que fueron examinados.
+
+No he creado una única variable mediante `coalesce()`, porque eso mezclaría participantes cuyo seguimiento comienza en momentos distintos. Para análisis basados únicamente en información de entrevista puede utilizarse el seguimiento desde entrevista. Cuando se incorporen variables de Examination o Labs, el origen temporal coherente será el examen MEC, ya que esas mediciones todavía no existían en la fecha de entrevista.
+
+```{r}
+#| label: tbl-followup-summary
+#| tbl-cap: "Resumen del tiempo de seguimiento según origen temporal y estado vital"
+followup_summary |>
+  transmute(
+    Origen = origin,
+    Grupo = vital_status,
+    N = n,
+    Eventos = events,
+    `Mínimo` = min_months,
+    `P25` = q1_months,
+    Mediana = median_months,
+    `P75` = q3_months,
+    `Máximo` = max_months,
+    `Mediana, años` = round(median_years, 2)
+  ) |>
+  kable(format.args = list(big.mark = ".", decimal.mark = ","))
+```
+
+```{r}
+#| label: fig-followup
+#| echo: false
+#| fig-cap: "Distribución del tiempo de seguimiento desde la entrevista entre participantes elegibles."
+knitr::include_graphics("outputs/figures/followup_distribution.png")
+```
+
+Además del resumen descriptivo, el pipeline comprueba que el evento esté observado para todos los elegibles, que los tiempos no sean negativos y que el seguimiento desde el examen no supere al seguimiento desde la entrevista cuando ambas escalas están disponibles.
+
+```{r}
+#| label: tbl-followup-audit
+#| tbl-cap: "Comprobaciones de coherencia del evento y el tiempo de seguimiento"
+followup_audit |>
+  transmute(
+    `Comprobación` = check,
+    Resultado = if_else(passed, "Superada", "Fallida"),
+    Detalle = detail
+  ) |>
+  kable()
+```
+
+# Informe de datos faltantes
+
+El fichero `outputs/tables/missingness_all_variables.csv` contiene el número y el porcentaje de valores faltantes para **cada variable** de la tabla analítica. En el informe principal no resulta útil imprimir más de mil filas, por lo que presento primero un resumen por módulo y después analizo con más detalle un conjunto de variables representativas.
+
+```{r}
+#| label: tbl-missingness-module
+#| tbl-cap: "Resumen del porcentaje bruto de datos faltantes por módulo"
+missingness_module |>
+  transmute(
+    `Módulo` = module,
+    Variables = n_variables,
+    `Mediana (%)` = round(median_pct_missing, 1),
+    `P25 (%)` = round(q1_pct_missing, 1),
+    `P75 (%)` = round(q3_pct_missing, 1),
+    `>10 %` = variables_gt_10pct,
+    `>50 %` = variables_gt_50pct,
+    `>90 %` = variables_gt_90pct,
+    `100 %` = variables_100pct
+  ) |>
+  kable(format.args = list(big.mark = ".", decimal.mark = ","))
+```
+
+```{r}
+#| label: fig-missingness-module
+#| echo: false
+#| fig-cap: "Distribución del porcentaje bruto de valores faltantes por módulo."
+knitr::include_graphics("outputs/figures/missingness_by_module.png")
+```
+
+Los porcentajes brutos deben interpretarse con cautela. En NHANES, un valor ausente puede significar que el participante no acudió al MEC, que no pertenecía a la edad objetivo, que una pregunta no era aplicable por un patrón de salto o que una prueba solo se realizó en una submuestra. Esas situaciones no son equivalentes a una respuesta omitida.
+
+## Separación entre no aplicabilidad y ausencia dentro de la población aplicable
+
+Para las variables seleccionadas he definido una población aplicable antes de interpretar la ausencia. Por ejemplo, la glucosa sérica y la hemoglobina glucosilada se evalúan entre participantes con registro de laboratorio de 12 o más años, mientras que la mortalidad se evalúa únicamente entre participantes elegibles para el archivo público. Estas reglas operativas quedan escritas en la tabla y en el código, por lo que pueden revisarse y ajustarse contra los codebooks antes de utilizar una variable en un modelo.
+
+```{r}
+#| label: tbl-core-missingness
+#| tbl-cap: "Datos faltantes brutos y dentro de la población aplicable"
+missingness_core |>
+  transmute(
+    Variable = label,
+    `Módulo` = module,
+    `Regla de aplicabilidad` = applicability_rule,
+    `No aplicables` = n_not_applicable,
+    `Faltantes brutos (%)` = round(pct_missing_raw, 1),
+    `N aplicable` = n_applicable,
+    `Faltantes en aplicables` = n_missing_applicable,
+    `Faltantes en aplicables (%)` = round(pct_missing_applicable, 1),
+    Lectura = missingness_type
+  ) |>
+  kable(format.args = list(big.mark = ".", decimal.mark = ","))
+```
+
+```{r}
+#| label: fig-core-missingness
+#| echo: false
+#| fig-cap: "Comparación entre el porcentaje bruto de ausencia y el observado dentro de la población aplicable."
+knitr::include_graphics("outputs/figures/missingness_raw_vs_applicable.png")
+```
+
+La diferencia es especialmente clara en variables condicionadas por edad y en mortalidad. Por ejemplo, el evento y el seguimiento presentan alrededor de un 40 % de ausencia sobre la cohorte completa, pero no tienen valores faltantes entre los participantes elegibles. En ese caso, hablar de imputación sería incorrecto: la ausencia es estructural.
+
+## Primera lectura de MCAR, MAR y MNAR
+
+La clasificación del mecanismo se ha planteado en dos pasos. Primero se separa la ausencia estructural. Después, únicamente dentro de la población aplicable, se estudia si el indicador de ausencia se relaciona con edad, sexo, grupo racial/étnico y razón ingresos-pobreza.
+
+Para este cribado se ajusta un modelo logístico del indicador de ausencia. La tabla muestra el contraste global, el pseudo-R² de McFadden y el AUC. El valor *p* informa de si existe asociación con variables observadas, pero con muestras grandes puede detectar diferencias pequeñas; por eso no se utiliza de forma aislada.
+
+```{r}
+#| label: tbl-mechanism-screen
+#| tbl-cap: "Cribado exploratorio del mecanismo de ausencia dentro de la población aplicable"
+missingness_screen |>
+  left_join(missingness_core |> select(variable, label), by = "variable") |>
+  transmute(
+    Variable = label,
+    `N aplicable` = n_applicable,
+    `Faltantes aplicables (%)` = round(pct_missing_applicable, 1),
+    `p global ajustado (BH)` = fmt_p(global_p_value_bh),
+    `R² McFadden` = ifelse(is.na(mcfadden_r2), "—", format(round(mcfadden_r2, 3), decimal.mark = ",", nsmall = 3)),
+    AUC = ifelse(is.na(auc), "—", format(round(auc, 3), decimal.mark = ",", nsmall = 3)),
+    `Interpretación` = interpretation
+  ) |>
+  kable(format.args = list(big.mark = ".", decimal.mark = ","))
+```
+
+La lectura inicial es la siguiente:
+
+1. **Ausencia estructural.** Explica una parte importante de los valores vacíos, sobre todo en Questionnaire, Labs y mortalidad. Debe conservarse como información sobre el diseño y no tratarse como no respuesta ordinaria.
+2. **MCAR.** No parece una hipótesis general razonable. En varias variables, la probabilidad de ausencia cambia con características observadas incluso después de restringir el análisis a la población aplicable.
+3. **MAR.** Puede utilizarse más adelante como hipótesis de trabajo para algunos procesos de ausencia si el modelo de imputación incorpora las variables observadas relacionadas con la falta de dato. Este informe no demuestra MAR.
+4. **MNAR.** No puede descartarse con los datos observados. Cuando se definan los predictores finales será necesario justificar el método de imputación y realizar análisis de sensibilidad.
+
+# Variables del diseño muestral
+
+La tabla analítica conserva los estratos, las unidades primarias de muestreo y los distintos pesos disponibles. Se han identificado `r fmt_n(nrow(survey_design))` variables relacionadas con el diseño o con pesos generales y de submuestra. En esta fase no se aplican porque no se están estimando parámetros poblacionales, pero deberán seleccionarse de acuerdo con los componentes utilizados en cada análisis. Ignorar esta elección más adelante produciría errores estándar y estimaciones que no representarían correctamente el diseño de NHANES.
+
+El inventario completo se encuentra en `outputs/tables/survey_design_inventory.csv`.
+
+# Productos generados
+
+La ejecución crea los siguientes productos principales:
+
+- `data/processed/nhanes_2013_2014_analytic.rds` y `.csv.gz`: tabla analítica final.
+- `outputs/tables/missingness_all_variables.csv`: porcentaje de ausencia para todas las variables.
+- `outputs/tables/missingness_core_variables.csv`: separación entre ausencia bruta y población aplicable.
+- `outputs/tables/missingness_mechanism_screen.csv`: cribado inicial de MCAR/MAR/MNAR.
+- `outputs/tables/followup_summary.csv` y `followup_audit.csv`: resumen y comprobaciones del seguimiento.
+- `outputs/tables/variable_dictionary.csv`: inventario técnico de variables.
+- `outputs/tables/cohort_profile.csv`: perfil mínimo de la cohorte integrada.
+- `outputs/figures/`: figuras descriptivas generadas por el pipeline.
+
+# Cierre
+
+Con esta entrega dejo preparada la base de trabajo para la fase metodológica de la tesis. La tabla queda integrada a nivel de participante, con mortalidad vinculada, evento definido, seguimiento desde entrevista y desde examen separados, auditoría de las uniones y un primer diagnóstico de los datos faltantes.
+
+La parte más importante no es obtener todavía un resultado clínico, sino dejar claro qué dato existe, de dónde procede, qué participantes forman el denominador y qué ausencias son estructurales antes de tomar decisiones de imputación, selección de predictores o validación de modelos. Esta separación entre construcción del dato y modelización es una salvaguarda inicial frente a la sobreestimación posterior del rendimiento.
+
+# Información de la sesión
+
+```{r}
+#| label: session-info
+#| echo: false
+cat(paste(readLines("outputs/tables/session_info.txt"), collapse = "\n"))
+```

@@ -1,0 +1,39 @@
+ENTREGA NHANES 2013-2014 - PIPELINE QUARTO/R
+Autor: Jesús Manuel Zahinos Gordillo
+
+
+El HTML permite leer el informe, pero no demuestra por sí solo la reproducibilidad. La carpeta completa contiene el código R, el documento Quarto, los datos de entrada congelados, la tabla analítica generada, las auditorías, las figuras, renv.lock y el historial local de Git.
+
+ARCHIVO PARA LEER EL INFORME
+----------------------------
+outputs/report/index.html
+
+ARCHIVO QUARTO PRINCIPAL
+------------------------
+index.qmd
+
+CÓDIGO PRINCIPAL DEL PIPELINE
+-----------------------------
+R/pipeline.R
+
+TABLA ANALÍTICA FINAL
+---------------------
+data/processed/nhanes_2013_2014_analytic.rds
+data/processed/nhanes_2013_2014_analytic.csv.gz
+
+FIGURAS
+-------
+outputs/figures/module_coverage.png
+outputs/figures/age_by_mortality_eligibility.png
+outputs/figures/followup_distribution.png
+outputs/figures/missingness_by_module.png
+outputs/figures/missingness_raw_vs_applicable.png
+
+REPRODUCIR EL INFORME
+---------------------
+Desde la raíz del proyecto:
+
+Rscript scripts/bootstrap.R
+quarto render
+
+El render ejecuta el pipeline antes del informe. Si los datos de entrada cambian, las comprobaciones de integridad y las huellas SHA-256 lo detectan.

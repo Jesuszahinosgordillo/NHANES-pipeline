@@ -1,0 +1,7 @@
+﻿"origin","vital_status","n","events","min_months","q1_months","median_months","q3_months","max_months","median_years"
+"Desde entrevista","Total elegibles",6100,0,1,65,72,79,85,6
+"Desde entrevista","Asumido vivo",5633,0,59,67,73,79,85,6.083333333333333
+"Desde entrevista","Fallecido",467,467,1,23,40,57.5,82,3.3333333333333335
+"Desde examen MEC","Total elegibles",5913,0,0,64,71,78,85,5.916666666666667
+"Desde examen MEC","Asumido vivo",5469,0,57,66,72,78,85,6
+"Desde examen MEC","Fallecido",444,444,0,22,39,57,81,3.25
