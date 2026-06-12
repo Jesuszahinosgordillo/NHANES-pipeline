@@ -1,7 +1,0 @@
-﻿"check","passed","detail"
-"Evento observado para todos los participantes elegibles",TRUE,"6100 / 6100"
-"Seguimiento desde entrevista disponible para todos los elegibles",TRUE,"6100 / 6100"
-"Seguimiento desde examen disponible para todos los elegibles examinados",TRUE,"5913 / 5913"
-"Valores de evento restringidos a 0 y 1",TRUE,"0, 1"
-"Seguimientos no negativos",TRUE,"Comprobado en PERMTH_INT y PERMTH_EXM"
-"El seguimiento desde examen no supera al seguimiento desde entrevista",TRUE,"5913 participantes con ambas escalas"

@@ -1,8 +1,0 @@
-﻿"check","value","expected","passed"
-"Filas de la tabla maestra",10175,10175,TRUE
-"Filas tras todas las uniones",10175,10175,TRUE
-"SEQN únicos en tabla final",10175,10175,TRUE
-"Registros Examination enlazados",9813,9813,TRUE
-"Registros Labs enlazados",9813,9813,TRUE
-"Registros Questionnaire enlazados",10175,10175,TRUE
-"Registros de mortalidad enlazados",10175,10175,TRUE
