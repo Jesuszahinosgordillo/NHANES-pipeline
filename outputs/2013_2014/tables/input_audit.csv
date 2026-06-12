@@ -1,0 +1,6 @@
+﻿"cycle","source","path","origin","rows","columns_after_resolution","distinct_seqn","duplicated_seqn","missing_seqn","sha256","sha256_verified"
+"2013-2014","demographic","data/raw/nhanes/demographic.csv","NHANES public-use Demographic data, cycle 2013-2014",10175,47,10175,0,0,"0b261c8cb09b947ed8acfb79b1c10c63bdbf86091c0fd9cb5a930d78e43ad87f",TRUE
+"2013-2014","examination","data/raw/nhanes/examination.csv","NHANES public-use Examination data, cycle 2013-2014",9813,224,9813,0,0,"8f687a309b8380fad7e5e2eb58550dbc2c7f75864019e717d5839775a6922abd",TRUE
+"2013-2014","labs","data/raw/nhanes/labs.csv","NHANES public-use Laboratory data, cycle 2013-2014",9813,371,9813,0,0,"638d9601cc7041260921338c9ee0cbd40257626392a690019c225f0fc2103930",TRUE
+"2013-2014","questionnaire","data/raw/nhanes/questionnaire.csv","NHANES public-use Questionnaire data, cycle 2013-2014",10175,952,10175,0,0,"e175e9361f1049c87fbf15932e55214dbef8a1c8ffb252ebe0ca9d7d5fdcde3f",TRUE
+"2013-2014","mortality","data/raw/mortality/NHANES_2013_2014_MORT_2019_PUBLIC.dat","NCHS Linked Mortality File public-use data, linked to NHANES 2013-2014",10175,8,10175,0,0,"588acea1d4cdf47a14cc9a35bd56e372739b8788d63ca0af98bf954c70c29905",TRUE

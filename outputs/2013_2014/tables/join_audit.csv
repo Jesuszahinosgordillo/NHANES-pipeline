@@ -1,0 +1,8 @@
+﻿"cycle","check","value","expected","passed"
+"2013-2014","Filas de la tabla maestra",10175,10175,TRUE
+"2013-2014","Filas tras todas las uniones",10175,10175,TRUE
+"2013-2014","SEQN únicos en tabla final",10175,10175,TRUE
+"2013-2014","Registros Examination enlazados",9813,9813,TRUE
+"2013-2014","Registros Labs enlazados",9813,9813,TRUE
+"2013-2014","Registros Questionnaire enlazados",10175,10175,TRUE
+"2013-2014","Registros de mortalidad enlazados",10175,10175,TRUE

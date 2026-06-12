@@ -1,0 +1,19 @@
+{
+  "cycle": "2013-2014",
+  "cycle_label": "NHANES 2013–2014",
+  "cycle_slug": "2013_2014",
+  "seed": 20260630,
+  "participant_key": "SEQN",
+  "n_participants": 10175,
+  "n_variables": 1606,
+  "mortality_followup_end": "2019-12-31",
+  "primary_followup_origin": "interview",
+  "exam_followup_variable": "mort__followup_months_exam",
+  "inputs": {
+    "demographic": "0b261c8cb09b947ed8acfb79b1c10c63bdbf86091c0fd9cb5a930d78e43ad87f",
+    "examination": "8f687a309b8380fad7e5e2eb58550dbc2c7f75864019e717d5839775a6922abd",
+    "labs": "638d9601cc7041260921338c9ee0cbd40257626392a690019c225f0fc2103930",
+    "questionnaire": "e175e9361f1049c87fbf15932e55214dbef8a1c8ffb252ebe0ca9d7d5fdcde3f",
+    "mortality": "588acea1d4cdf47a14cc9a35bd56e372739b8788d63ca0af98bf954c70c29905"
+  }
+}
