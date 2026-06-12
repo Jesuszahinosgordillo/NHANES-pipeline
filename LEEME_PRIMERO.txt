@@ -1,0 +1,53 @@
+LEEME PRIMERO
+
+Carpeta raíz del proyecto:
+NHANES_pipeline_v2
+
+La carpeta correcta es la que contiene:
+_quarto.yml
+index.qmd
+R
+scripts
+config
+data
+outputs
+
+No hay que ejecutar el proyecto desde dentro de scripts/. Si aun así se hace, scripts/run_pipeline.R intenta subir automáticamente a la raíz.
+
+PARA EJECUTAR TODO
+
+Desde terminal:
+quarto render
+
+Desde R/RStudio:
+source("scripts/run_pipeline.R", encoding = "UTF-8")
+quarto::quarto_render()
+
+QUÉ PIDE EL TUTOR Y DÓNDE ESTÁ
+
+1. Pipeline parametrizado por ciclo:
+config/sources.yml
+R/pipeline.R
+
+2. Datos crudos versionados y documentados:
+data/raw/
+data/raw/README.md
+docs/DATA_PROVENANCE.md
+config/sources.yml
+
+3. Nombres alineados:
+scripts/bootstrap.R -> prepara/restaura paquetes
+scripts/run_pipeline.R -> ejecuta el pipeline y lo llama Quarto
+R/pipeline.R -> código principal del pipeline
+
+SALIDAS PRINCIPALES DEL CICLO 2013-2014
+
+data/processed/2013_2014/nhanes_analytic.rds
+data/processed/2013_2014/nhanes_analytic.csv.gz
+outputs/2013_2014/tables/
+outputs/2013_2014/figures/
+outputs/report/index.html
+
+NOTA
+
+Los CSV, figuras y datos procesados no están hechos a mano. Se generan al ejecutar el pipeline.
