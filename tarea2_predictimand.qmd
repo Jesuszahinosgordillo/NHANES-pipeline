@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Protocolo del predictimand, outcome a 5 años y auditoría de predictores</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.55;max-width:980px;margin:40px auto;padding:0 24px;color:#222}
+h1,h2,h3{line-height:1.25;margin-top:1.5em}
+table{border-collapse:collapse;width:100%;margin:1em 0;font-size:.95em}
+th,td{border:1px solid #ddd;padding:8px;vertical-align:top}
+th{background:#f6f6f6}
+code{background:#f4f4f4;padding:2px 4px;border-radius:4px}
+pre{background:#f4f4f4;padding:12px;overflow:auto;border-radius:6px}
+blockquote{border-left:4px solid #ddd;margin:1em 0;padding:.2em 1em;color:#444;background:#fafafa}
+</style>
+</head>
+<body>
+<h1>1. Objetivo de esta fase</h1>
+<p>En esta fase dejo definido el problema de predicción antes de empezar con modelos. La idea es fijar por escrito qué se quiere predecir, en qué población, desde qué momento y con qué información, para no ir cambiando decisiones después en función de los resultados.</p>
+<p>No se entrena ningún modelo en este documento. Tampoco se calcula AUC, no se comparan algoritmos y no se hace selección de variables por rendimiento. Lo que queda cerrado aquí es el predictimand, la definición del desenlace a 5 años y una primera auditoría clínica de predictores.</p>
+<p>En este caso la parte delicada no es tanto la fuga clásica por usar variables medidas después del desenlace. En NHANES, los predictores candidatos son basales y la mortalidad se observa durante el seguimiento. El problema más fino está en la causalidad inversa: algunas variables medidas al inicio pueden ser, en realidad, señales de una enfermedad avanzada o de un proceso letal ya iniciado. Por eso no las trato como fuga directa, pero sí las dejo marcadas como variables dudosas.</p>
+<h1>2. Objetivo de predicción</h1>
+<p>El objetivo de predicción queda definido como:</p>
+<blockquote>
+<p><strong>Mortalidad por cualquier causa a 5 años en adultos de 50 años o más al inicio.</strong></p>
+</blockquote>
+<p>Se trabajará con un desenlace binario a 5 años. El caso positivo será fallecer por cualquier causa dentro de los 60 meses posteriores al momento basal. El caso negativo será estar vivo al completar esos 60 meses.</p>
+<p>Mantengo el enfoque binario, no de supervivencia, porque encaja mejor con las fases posteriores del trabajo: definición del caso positivo, desbalance de clases, elección de métricas, comparación PR frente a ROC y selección de umbral. El tiempo a evento se conserva en el Linked Mortality File, pero no será la respuesta principal en esta fase. Si más adelante se abre una rama de supervivencia, habrá que tratarla como un análisis distinto.</p>
+<p>Las comorbilidades y diagnósticos previos se consideran predictores basales legítimos. En mortalidad por cualquier causa, antecedentes como cáncer, infarto, ictus, diabetes o hipertensión no son fuga por sí mismos: forman parte del estado basal del participante y tienen sentido clínico como predictores.</p>
+<h1>3. Predictimand</h1>
+<p>El predictimand queda fijado de la siguiente forma:</p>
+<blockquote>
+<p>Riesgo individual de fallecer por cualquier causa durante los 5 años posteriores al examen basal MEC, en participantes de NHANES 2013-2014 de 50 años o más, elegibles para mortalidad pública, usando únicamente información basal disponible en el momento de predicción.</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+  <th>Elemento</th>
+  <th>Decisión</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Población</td>
+  <td>Adultos de 50 años o más al inicio</td>
+</tr>
+<tr>
+  <td>Unidad de análisis</td>
+  <td>Participante individual (<code>SEQN</code>)</td>
+</tr>
+<tr>
+  <td>T0</td>
+  <td>Examen MEC basal</td>
+</tr>
+<tr>
+  <td>Horizonte</td>
+  <td>5 años, equivalentes a 60 meses</td>
+</tr>
+<tr>
+  <td>Desenlace</td>
+  <td>Mortalidad por cualquier causa dentro del horizonte</td>
+</tr>
+<tr>
+  <td>Caso positivo</td>
+  <td>Fallecimiento antes o en 60 meses</td>
+</tr>
+<tr>
+  <td>Información permitida</td>
+  <td>Variables basales disponibles en T0 o antes de T0</td>
+</tr>
+</tbody>
+</table>
+<h1>4. Unidad de análisis y momento T0</h1>
+<p>La unidad de análisis es el participante individual, identificado por <code>SEQN</code>. La tabla analítica tiene una fila por persona. Los módulos de NHANES no se tratan como unidades independientes; son fuentes de información que se integran a nivel de participante.</p>
+<p>El momento de predicción principal será el examen MEC basal. Esta decisión permite usar como predictores basales tanto variables de entrevista como variables de exploración física y laboratorio. Por coherencia con ese T0, el reloj principal de seguimiento será <code>PERMTH_EXM</code>.</p>
+<p><code>PERMTH_INT</code> se conserva para auditoría, pero no será el reloj principal del desenlace. Si en otra fase se quisiera plantear un modelo solo con información de entrevista, habría que definir otro predictimand y usar otro T0.</p>
+<h1>5. Elegibilidad y seguimiento potencial</h1>
+<p>Los criterios de elegibilidad se fijan antes del modelado:</p>
+<ol>
+<li>estar en la tabla integrada NHANES 2013-2014;</li>
+<li>tener 50 años o más al inicio;</li>
+<li>ser elegible para la vinculación pública de mortalidad;</li>
+<li>haber realizado el examen MEC, porque T0 se fija ahí;</li>
+<li>tener seguimiento desde MEC disponible;</li>
+<li>tener estado a 5 años observable para el análisis binario principal.</li>
+</ol>
+<p>Además, para usar mortalidad a 5 años como desenlace binario, el ciclo incluido debe tener seguimiento potencial suficiente hasta el corte del Linked Mortality File. En este caso se trabaja con NHANES 2013-2014 y con el LMF público con seguimiento hasta 2019, por lo que el horizonte de 60 meses es viable. Si después se incorporan otros ciclos, este punto se tendrá que comprobar ciclo a ciclo antes de incluirlos.</p>
+<p>La auditoría de elegibilidad queda así:</p>
+<table>
+<thead>
+<tr>
+  <th>Criterio</th>
+  <th>N</th>
+  <th>Nota</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Muestra integrada NHANES 2013-2014</td>
+  <td>10175</td>
+  <td>Tabla analítica integrada por <code>SEQN</code>.</td>
+</tr>
+<tr>
+  <td>Adultos con edad &gt;=50 años al inicio</td>
+  <td>2780</td>
+  <td>Población diana definida antes de modelar.</td>
+</tr>
+<tr>
+  <td>Elegibles para Linked Mortality File público</td>
+  <td>2775</td>
+  <td>Necesario para observar mortalidad vinculada.</td>
+</tr>
+<tr>
+  <td>Con examen MEC realizado</td>
+  <td>2696</td>
+  <td>T0 se fija en MEC para poder usar exploración y laboratorio como información basal.</td>
+</tr>
+<tr>
+  <td>Con seguimiento desde examen disponible</td>
+  <td>2696</td>
+  <td>Reloj principal: <code>PERMTH_EXM</code>.</td>
+</tr>
+<tr>
+  <td>Con desenlace binario a 5 años observable</td>
+  <td>2681</td>
+  <td>Incluye fallecidos antes/en 60 meses y no eventos con seguimiento &gt;=60 meses. Los vivos con seguimiento &lt;60 meses no se etiquetan como 0.</td>
+</tr>
+</tbody>
+</table>
+<h1>6. Definición del outcome, caso positivo y censura</h1>
+<p>El desenlace principal será binario:</p>
+<ul>
+<li><code>Y = 1</code>: muerte por cualquier causa antes o en los 60 meses posteriores al examen MEC.</li>
+<li><code>Y = 0</code>: ausencia de muerte antes o en 60 meses, siempre que el participante tenga seguimiento conocido al menos hasta completar los 60 meses.</li>
+</ul>
+<p>La censura es una decisión importante en este objetivo. Un participante que sigue vivo pero tiene menos de 5 años de seguimiento no puede considerarse superviviente confirmado a 5 años. Si se etiquetara como <code>0</code>, se estaría introduciendo una etiqueta incorrecta. Por eso, esos participantes no entran en el análisis binario principal.</p>
+<p>La regla operativa queda así:</p>
+<pre><code class="language-text">positivo = MORTSTAT == 1 y PERMTH_EXM &lt;= 60
+negativo = PERMTH_EXM &gt;= 60 y no hay muerte antes/en 60 meses
+censurado antes de 5 años sin evento = no se usa como 0 en el análisis binario principal
+</code></pre>
+<p>Resumen del outcome con la tabla actual:</p>
+<table>
+<thead>
+<tr>
+  <th>Medida</th>
+  <th>Valor</th>
+  <th>Nota</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>N análisis binario primario</td>
+  <td>2681</td>
+  <td>Adultos &gt;=50, elegibles, con MEC y estado a 5 años observable.</td>
+</tr>
+<tr>
+  <td>Casos positivos: muerte por cualquier causa antes/en 5 años</td>
+  <td>321</td>
+  <td><code>death_5y=1</code> si <code>MORTSTAT=1</code> y <code>PERMTH_EXM&lt;=60</code>.</td>
+</tr>
+<tr>
+  <td>Casos negativos: sin muerte antes/en 5 años</td>
+  <td>2360</td>
+  <td><code>death_5y=0</code> solo si hay seguimiento al menos hasta 60 meses. Incluye muertes posteriores a los 5 años, porque a los 5 años seguían vivos.</td>
+</tr>
+<tr>
+  <td>Muertes posteriores al horizonte de 5 años</td>
+  <td>75</td>
+  <td>No son caso positivo para este outcome binario a 5 años.</td>
+</tr>
+<tr>
+  <td>Censurados antes de 5 años sin evento</td>
+  <td>15</td>
+  <td>No se codifican como supervivientes; quedan fuera del análisis binario primario.</td>
+</tr>
+</tbody>
+</table>
+<p>Una muerte posterior a los 5 años no es caso positivo para este desenlace. Para este outcome, esa persona cuenta como no evento porque estaba viva al completar los 60 meses. El tiempo exacto de seguimiento queda guardado, pero no se modela como tiempo-hasta-evento en esta fase.</p>
+<h1>7. Auditoría de predictores</h1>
+<p>La tabla completa de auditoría queda guardada en:</p>
+<pre><code class="language-text">protocols/predictor_audit_table.csv
+</code></pre>
+<p>Uso tres categorías:</p>
+<table>
+<thead>
+<tr>
+  <th>Categoría</th>
+  <th>Criterio</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Admisible</td>
+  <td>Variable basal disponible en T0 o antes de T0, clínicamente interpretable y no derivada del seguimiento ni de la mortalidad.</td>
+</tr>
+<tr>
+  <td>Dudosa</td>
+  <td>Variable basal que puede ser útil, pero también puede reflejar deterioro avanzado o enfermedad letal ya en marcha. Requiere justificación clínica o análisis de sensibilidad.</td>
+</tr>
+<tr>
+  <td>Excluida</td>
+  <td>Identificadores, variables técnicas, diseño muestral, seguimiento, mortalidad, causa de muerte o derivados internos del pipeline.</td>
+</tr>
+</tbody>
+</table>
+<p>Resumen de la auditoría:</p>
+<table>
+<thead>
+<tr>
+  <th>Clasificación</th>
+  <th>Bloques</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Admisible</td>
+  <td>19</td>
+</tr>
+<tr>
+  <td>Dudosa</td>
+  <td>6</td>
+</tr>
+<tr>
+  <td>Excluida</td>
+  <td>5</td>
+</tr>
+</tbody>
+</table>
+<p>La lista de excluidas es pequeña, como era esperable en esta cohorte. El trabajo importante está en separar bien lo admisible de lo dudoso.</p>
+<h1>8. Variables dudosas principales</h1>
+<p>Las variables dudosas no se eliminan automáticamente. Las dejo separadas porque pueden actuar como señales de muerte cercana, aunque estén medidas al inicio.</p>
+<table>
+<thead>
+<tr>
+  <th>Bloque</th>
+  <th>Variables</th>
+  <th>Decisión inicial</th>
+  <th>Motivo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Salud autopercibida</td>
+  <td><code>HSD010</code></td>
+  <td>Dudosa</td>
+  <td>Puede resumir un deterioro global ya percibido por el participante. Es el caso más claro de posible causalidad inversa.</td>
+</tr>
+<tr>
+  <td>Pérdida de peso / historia de peso</td>
+  <td>Variables WHQ/WHD</td>
+  <td>Dudosa</td>
+  <td>La pérdida de peso, especialmente si es reciente o involuntaria, puede reflejar enfermedad avanzada.</td>
+</tr>
+<tr>
+  <td>IMC muy bajo en mayores</td>
+  <td><code>BMXBMI</code></td>
+  <td>Dudosa</td>
+  <td>En mayores puede indicar fragilidad, caquexia o enfermedad previa al fallecimiento.</td>
+</tr>
+<tr>
+  <td>Albúmina baja</td>
+  <td><code>LBXSAL</code>, <code>LBDSALSI</code></td>
+  <td>Dudosa</td>
+  <td>Puede reflejar inflamación, desnutrición o enfermedad avanzada.</td>
+</tr>
+<tr>
+  <td>Limitación funcional / dificultad para caminar</td>
+  <td>Variables PFQ/DLQ</td>
+  <td>Dudosa</td>
+  <td>Puede ser predictor legítimo de fragilidad, pero también señal de deterioro cercano al desenlace.</td>
+</tr>
+<tr>
+  <td>Inflamación muy elevada</td>
+  <td><code>LBXWBCSI</code></td>
+  <td>Dudosa</td>
+  <td>Valores muy altos pueden reflejar infección, cáncer avanzado u otro proceso agudo o avanzado.</td>
+</tr>
+</tbody>
+</table>
+<p>En el modelo principal no deberían entrar sin una justificación clara. En fases posteriores se puede comparar, si procede, un modelo más conservador sin estas variables frente a otro que las incluya de forma documentada.</p>
+<h1>9. Variables excluidas</h1>
+<p>La exclusión se concentra en variables que no representan información clínica basal utilizable como predictor.</p>
+<table>
+<thead>
+<tr>
+  <th>Bloque</th>
+  <th>Decisión</th>
+  <th>Motivo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Identificación del participante</td>
+  <td>Excluir</td>
+  <td><code>SEQN</code> es un identificador técnico, no una variable clínica.</td>
+</tr>
+<tr>
+  <td>Diseño muestral y pesos</td>
+  <td>Excluir como predictores</td>
+  <td>Son variables de diseño, no características clínicas individuales.</td>
+</tr>
+<tr>
+  <td>Estado de entrevista/examen y variables administrativas</td>
+  <td>Excluir como predictores clínicos</td>
+  <td>Pueden introducir artefactos de recogida o proceso.</td>
+</tr>
+<tr>
+  <td>Mortalidad, causa de muerte y seguimiento</td>
+  <td>Excluir</td>
+  <td>Son outcome, causa del outcome o información de seguimiento. Usarlas sería fuga directa.</td>
+</tr>
+<tr>
+  <td>Variables internas del pipeline</td>
+  <td>Excluir</td>
+  <td>Sirven para control técnico, no para predicción clínica.</td>
+</tr>
+</tbody>
+</table>
+<p>Las comorbilidades previas no se excluyen. En este problema son parte del estado basal del participante y se consideran admisibles.</p>
+<h1>10. Lecturas usadas</h1>
+<p>Para cerrar esta fase he revisado los documentos metodológicos sobre auditoría de predictores, definición del outcome y compromisos previos al modelado. Los uso como apoyo metodológico, no para buscar resultados ni para decidir en función del rendimiento.</p>
+<p>Del documento de auditoría tomo la idea de revisar cada predictor antes de entrenar modelos: cuándo está disponible, si puede actuar como proxy del desenlace, si es una variable derivada o de seguimiento, y si puede introducir fuga de información.</p>
+<p>Del documento C3 tomo especialmente la necesidad de fijar antes del modelado el tipo de desenlace, el caso positivo, el horizonte temporal y las consecuencias para desbalance, métricas y umbral. En esta tarea añado una decisión específica que no se puede ignorar con mortalidad a 5 años: los participantes vivos con menos de 60 meses de seguimiento no son controles confirmados.</p>
+<h1>11. Decisiones fijadas antes del modelado</h1>
+<p>Dejo fijadas estas decisiones:</p>
+<ul>
+<li>objetivo: mortalidad por cualquier causa a 5 años;</li>
+<li>población: adultos de 50 años o más;</li>
+<li>unidad de análisis: participante individual (<code>SEQN</code>);</li>
+<li>T0: examen MEC basal;</li>
+<li>reloj principal: <code>PERMTH_EXM</code>;</li>
+<li>caso positivo: muerte por cualquier causa antes o en 60 meses;</li>
+<li>caso negativo: vivo al completar 60 meses, o muerte posterior al horizonte;</li>
+<li>censurados antes de 60 meses sin evento: fuera del análisis binario principal;</li>
+<li>tipo de outcome: binario a 5 años, no tiempo-hasta-evento;</li>
+<li>predictores de mortalidad, causa de muerte y seguimiento: excluidos;</li>
+<li>comorbilidades previas: admisibles;</li>
+<li>variables de posible causalidad inversa: dudosas, no excluidas automáticamente;</li>
+<li>modelos y métricas: no se trabajan en esta fase.</li>
+</ul>
+<p>Con esto queda definida la pregunta predictiva. La siguiente fase ya podrá trabajar con una población, un desenlace y una auditoría de predictores fijados antes de mirar rendimiento.</p>
+
+</body>
+</html>
