@@ -1,87 +1,51 @@
-# Validación del pipeline
+# Validación técnica
 
-Este archivo resume las comprobaciones que deja hechas el proyecto.
+## Tarea 1: pipeline NHANES
 
-## Entradas
+El pipeline comprueba, entre otras cosas:
 
-Las fuentes se declaran en `config/sources.yml`. Para cada una se guarda:
+- que haya una sola fila por `SEQN`;
+- que las uniones no alteren el número de participantes de la tabla base;
+- que los archivos de entrada coincidan con las huellas SHA-256 esperadas;
+- que no queden nombres duplicados o sufijos `.x`/`.y` problemáticos;
+- que la mortalidad y los tiempos de seguimiento sean coherentes;
+- que los faltantes se describan separando ausencia estructural y ausencia dentro de la población aplicable.
 
-- ruta local del fichero;
-- número esperado de filas;
-- SHA-256 esperado;
-- módulo de procedencia;
-- prefijo usado en la tabla analítica.
+Para 2013-2014 se esperan estas comprobaciones principales:
 
-Al ejecutar el pipeline se comprueba que los ficheros existen, que el SHA-256 coincide y que `SEQN` no está duplicado dentro de cada fuente.
+- 10.175 participantes en la tabla analítica;
+- una fila por `SEQN`;
+- mortalidad vinculada a nivel de participante;
+- seguimiento desde entrevista y desde examen MEC conservados por separado;
+- salidas por ciclo en `outputs/2013_2014/`.
 
-## Uniones
+## Tarea 2: predictimand y outcome a 5 años
 
-`R/pipeline.R` usa `Demographic` como tabla base y une el resto de módulos con `left_join()` por `SEQN`.
+La Tarea 2 queda documentada en `protocols/tarea2_predictimand.qmd` y en sus tablas asociadas.
 
-Se comprueba que:
+Comprobaciones principales:
 
-- no se pierden participantes respecto a Demographic;
-- la tabla final mantiene un único registro por `SEQN`;
-- los módulos secundarios no introducen participantes que no estén en Demographic;
-- las uniones son uno-a-uno.
+- el objetivo es mortalidad por cualquier causa a 5 años en adultos de 50 años o más;
+- la unidad de análisis es el participante individual (`SEQN`);
+- T0 se fija en el examen MEC basal;
+- el reloj principal es `PERMTH_EXM`;
+- el caso positivo es muerte por cualquier causa antes o en 60 meses desde MEC;
+- el caso negativo exige seguimiento conocido al menos hasta 60 meses sin muerte dentro del horizonte;
+- los vivos con menos de 60 meses de seguimiento no se codifican como controles;
+- el tiempo a evento se conserva en el LMF, pero no se usa como respuesta principal en esta fase;
+- `protocols/predictor_audit_table.csv` clasifica los bloques de variables como admisibles, dudosos o excluidos;
+- mortalidad, causa de muerte, seguimiento e identificadores técnicos quedan fuera del set predictor;
+- las comorbilidades previas se mantienen como admisibles;
+- las variables con posible causalidad inversa quedan marcadas como dudosas, no como excluidas automáticas;
+- no se ajustan modelos ni se calculan métricas de rendimiento.
 
-El resumen queda en:
+El script `scripts/run_task2.R` genera las tablas de elegibilidad, outcome y auditoría en `outputs/task2/` y `protocols/`.
 
-```text
-outputs/2013_2014/tables/join_audit.csv
-```
-
-## Mortalidad y seguimiento
-
-El Linked Mortality File se une también por `SEQN`.
-
-Se mantienen separados los dos tiempos de seguimiento:
-
-- `mort__followup_months_interview`: seguimiento desde entrevista;
-- `mort__followup_months_exam`: seguimiento desde examen MEC.
-
-No se funden en una sola variable porque tienen distinto origen temporal. Las comprobaciones quedan en:
-
-```text
-outputs/2013_2014/tables/followup_audit.csv
-outputs/2013_2014/tables/followup_summary.csv
-```
-
-## Datos faltantes
-
-El informe separa dos cosas:
-
-- ausencia bruta sobre toda la cohorte;
-- ausencia dentro de la población realmente aplicable.
-
-Esto es importante en NHANES porque muchos valores vacíos no son errores, sino ausencia estructural por edad, submuestras, examen MEC o saltos de cuestionario.
-
-Las tablas principales son:
-
-```text
-outputs/2013_2014/tables/missingness_all_variables.csv
-outputs/2013_2014/tables/missingness_core_variables.csv
-outputs/2013_2014/tables/missingness_mechanism_screen.csv
-```
-
-## Reproducibilidad
-
-La semilla está fijada en `config/sources.yml`. El entorno de paquetes queda descrito en `renv.lock`.
-
-Para reconstruir el entorno en un equipo nuevo:
-
-```bash
-Rscript scripts/bootstrap.R
-```
-
-Para ejecutar el pipeline:
-
-```bash
-Rscript scripts/run_pipeline.R
-```
-
-Para renderizar el informe completo:
+## Cómo comprobarlo
 
 ```bash
 quarto render
+Rscript tests/testthat.R
+Rscript scripts/run_task2.R
+quarto render protocols/tarea2_predictimand.qmd
 ```
