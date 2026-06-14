@@ -1,0 +1,51 @@
+project:
+  seed: 20260630
+  participant_key: "SEQN"
+  active_cycles:
+    - "2013-2014"
+
+cycles:
+  - id: "2013-2014"
+    slug: "2013_2014"
+    label: "NHANES 2013–2014"
+    mortality_followup_end: "2019-12-31"
+    notes: "Primer ciclo incorporado al pipeline. La estructura permite añadir ciclos posteriores sin reescribir el código."
+    sources:
+      demographic:
+        path: "data/raw/nhanes/demographic.csv"
+        expected_rows: 10175
+        expected_sha256: "0b261c8cb09b947ed8acfb79b1c10c63bdbf86091c0fd9cb5a930d78e43ad87f"
+        prefix: "dem__"
+        origin: "NHANES public-use Demographic data, cycle 2013-2014"
+      examination:
+        path: "data/raw/nhanes/examination.csv"
+        expected_rows: 9813
+        expected_sha256: "8f687a309b8380fad7e5e2eb58550dbc2c7f75864019e717d5839775a6922abd"
+        prefix: "exam__"
+        origin: "NHANES public-use Examination data, cycle 2013-2014"
+        character_columns: ["OHX02CTC", "OHX03CTC", "OHX04CTC", "OHX05CTC", "OHX06CTC", "OHX07CTC", "OHX08CTC", "OHX09CTC", "OHX10CTC", "OHX11CTC", "OHX12CTC", "OHX13CTC", "OHX14CTC", "OHX15CTC", "OHX18CTC", "OHX19CTC", "OHX20CTC", "OHX21CTC", "OHX22CTC", "OHX23CTC", "OHX24CTC", "OHX25CTC", "OHX26CTC", "OHX27CTC", "OHX28CTC", "OHX29CTC", "OHX30CTC", "OHX31CTC", "CSXTSEQ"]
+      labs:
+        path: "data/raw/nhanes/labs.csv"
+        expected_rows: 9813
+        expected_sha256: "638d9601cc7041260921338c9ee0cbd40257626392a690019c225f0fc2103930"
+        prefix: "lab__"
+        origin: "NHANES public-use Laboratory data, cycle 2013-2014"
+      questionnaire:
+        path: "data/raw/nhanes/questionnaire.csv"
+        expected_rows: 10175
+        expected_sha256: "e175e9361f1049c87fbf15932e55214dbef8a1c8ffb252ebe0ca9d7d5fdcde3f"
+        prefix: "quest__"
+        origin: "NHANES public-use Questionnaire data, cycle 2013-2014"
+        character_columns: ["SMDUPCA", "SMD100BR"]
+      mortality:
+        path: "data/raw/mortality/NHANES_2013_2014_MORT_2019_PUBLIC.dat"
+        expected_rows: 10175
+        expected_sha256: "588acea1d4cdf47a14cc9a35bd56e372739b8788d63ca0af98bf954c70c29905"
+        prefix: "mort__"
+        official_url: "https://ftp.cdc.gov/pub/Health_Statistics/NCHS/datalinkage/linked_mortality/NHANES_2013_2014_MORT_2019_PUBLIC.dat"
+        origin: "NCHS Linked Mortality File public-use data, linked to NHANES 2013-2014"
+
+data_governance:
+  raw_data_policy: "Los datos crudos incluidos son ficheros públicos de NHANES/NCHS o extractos congelados por módulo derivados de ellos. Cada entrada se verifica mediante SHA-256 antes de procesar."
+  license_note: "Datos públicos de NHANES/NCHS. Deben citarse las fuentes oficiales y respetarse las condiciones de uso de los ficheros public-use."
+  git_note: "Los ficheros crudos actuales están dentro de los límites habituales de GitHub por archivo. Si se añaden más ciclos o ficheros grandes, se recomienda Git LFS o un almacenamiento externo documentado."
