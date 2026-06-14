@@ -1,6 +1,0 @@
-medida,valor,nota
-N análisis binario primario,2681,"Adultos >=50, elegibles, con MEC y estado a 5 años observable."
-Casos positivos: muerte por cualquier causa antes/en 5 años,321,death_5y=1 si MORTSTAT=1 y PERMTH_EXM<=60.
-Casos negativos: sin muerte antes/en 5 años,2360,"death_5y=0 solo si hay seguimiento al menos hasta 60 meses. Incluye muertes posteriores a los 5 años, porque a 5 años seguían vivos."
-Muertes posteriores al horizonte de 5 años,75,No son caso positivo para este outcome binario a 5 años.
-Censurados antes de 5 años sin evento,15,No se codifican como supervivientes; quedan fuera del análisis binario primario.
