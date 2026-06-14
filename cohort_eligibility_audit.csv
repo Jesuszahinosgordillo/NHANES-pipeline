@@ -1,7 +1,0 @@
-criterio,n,nota
-Muestra integrada NHANES 2013-2014,10175,Tabla analítica integrada por SEQN.
-Adultos con edad >=50 años al inicio,2780,Población diana definida antes de modelar.
-Elegibles para Linked Mortality File público,2775,Necesario para poder observar mortalidad vinculada.
-Con examen MEC realizado,2696,"T0 se fija en el examen MEC, para poder usar exploración y laboratorio como información basal."
-Con seguimiento desde examen disponible,2696,Reloj principal: PERMTH_EXM.
-Con desenlace binario a 5 años observable,2681,Incluye fallecidos antes/en 60 meses y no eventos con seguimiento >=60 meses. Los vivos con seguimiento <60 meses no se etiquetan como 0.
