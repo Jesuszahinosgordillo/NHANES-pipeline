@@ -1,0 +1,68 @@
+LEEME PRIMERO
+
+PASO IMPORTANTE
+
+Antes de abrir nada en RStudio, hay que extraer el ZIP completo.
+En Windows: clic derecho sobre el ZIP -> Extraer todo.
+No ejecute 00_EJECUTAR_DESDE_AQUI.R directamente desde la vista comprimida del ZIP,
+porque RStudio lo abre como un archivo temporal y no encuentra el resto del proyecto.
+
+Carpeta raíz del proyecto:
+Tarea 2
+
+La carpeta correcta es la que contiene directamente:
+_quarto.yml
+index.qmd
+R
+scripts
+config
+data
+outputs
+protocols
+
+FORMA RECOMENDADA DE EJECUTAR
+
+1. Extraiga el ZIP completo.
+2. Abra el archivo NHANES-reproducible-pipeline.Rproj.
+3. En RStudio, abra 00_EJECUTAR_DESDE_AQUI.R y ejecute todo el contenido.
+
+También se puede ejecutar desde la consola de R:
+
+source("scripts/run_pipeline.R", encoding = "UTF-8")
+source("scripts/run_task2.R", encoding = "UTF-8")
+quarto::quarto_render("index.qmd")
+quarto::quarto_render("protocols/tarea2_predictimand.qmd")
+
+QUÉ CONVIENE REVISAR Y DÓNDE ESTÁ
+
+1. Informe principal de la Tarea 2:
+protocols/tarea2_predictimand.html
+outputs/task2/tarea2_predictimand.html
+
+2. Tabla de auditoría de predictores:
+outputs/task2/predictor_audit_table.csv
+
+3. Resumen del outcome binario a 5 años:
+outputs/task2/outcome_5y_summary.csv
+
+4. Auditoría de elegibilidad de la cohorte:
+outputs/task2/cohort_eligibility_audit.csv
+
+5. Procedencia y licencia de los datos:
+docs/DATA_PROVENANCE.md
+
+6. Configuración parametrizada por ciclos:
+config/sources.yml
+R/pipeline.R
+
+7. Scripts principales:
+scripts/run_pipeline.R -> ejecuta el pipeline principal y lo llama Quarto
+R/pipeline.R -> código principal del pipeline
+scripts/run_task2.R -> genera las tablas de la Tarea 2
+protocols/tarea2_predictimand.qmd -> protocolo editable del predictimand y auditoría
+
+NOTA
+
+Los CSV, figuras y datos procesados no están hechos a mano. Se generan al ejecutar el pipeline.
+La Tarea 2 no entrena modelos: solo fija el predictimand, el outcome binario a 5 años,
+la censura y la auditoría clínica de predictores.

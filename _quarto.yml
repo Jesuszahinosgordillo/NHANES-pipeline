@@ -1,0 +1,22 @@
+project:
+  type: default
+  output-dir: outputs/report
+  render:
+    - index.qmd
+  pre-render: Rscript scripts/run_pipeline.R
+
+format:
+  html:
+    theme: default
+    toc: true
+    toc-depth: 3
+    code-fold: true
+    code-summary: "Mostrar código"
+    embed-resources: true
+    df-print: paged
+
+execute:
+  echo: true
+  warning: false
+  message: false
+  error: false

@@ -1,0 +1,27 @@
+Package: nhanesReproduciblePipeline
+Type: Project
+Title: Reproducible NHANES 2013-2014 Ingestion Pipeline
+Version: 0.1.0
+Authors@R: person("Jesús Manuel", "Zahinos Gordillo", role = c("aut", "cre"))
+Description: Quarto and R pipeline for participant-level NHANES integration,
+    linked mortality, missing-data auditing and reproducible reporting.
+License: MIT
+Encoding: UTF-8
+Imports:
+    broom,
+    digest,
+    dplyr,
+    fs,
+    ggplot2,
+    here,
+    jsonlite,
+    knitr,
+    purrr,
+    readr,
+    rmarkdown,
+    scales,
+    testthat,
+    tibble,
+    tidyr,
+    vroom,
+    yaml
